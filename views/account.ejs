@@ -1,0 +1,81 @@
+<%- include('./partials/header') %>
+
+<div class="w-full min-h-screen flex flex-col items-center px-20 py-16">
+    <div class="w-full max-w-3xl">
+
+        <h2 class="text-2xl font-semibold mb-8">My Account</h2>
+
+        <!-- Profile Summary -->
+        <div class="flex items-center gap-5 mb-10">
+            <div class="w-20 h-20 rounded-full overflow-hidden bg-zinc-200 flex items-center justify-center">
+                <% if(user.picture){ %>
+                    <img class="w-full h-full object-cover" src="<%= user.picture %>" alt="profile picture">
+                <% } else { %>
+                    <span class="text-2xl text-zinc-500"><%= user.fullname.charAt(0).toUpperCase() %></span>
+                <% } %>
+            </div>
+            <div>
+                <h3 class="text-xl font-medium"><%= user.fullname %></h3>
+                <p class="text-zinc-500"><%= user.email %></p>
+            </div>
+        </div>
+
+        <!-- Details -->
+        <div class="mb-10 border-t pt-6">
+            <h3 class="text-lg font-semibold mb-4">Details</h3>
+            <div class="grid grid-cols-2 gap-4 text-zinc-700">
+                <div>
+                    <p class="text-sm text-zinc-500">Full Name</p>
+                    <p><%= user.fullname %></p>
+                </div>
+                <div>
+                    <p class="text-sm text-zinc-500">Email</p>
+                    <p><%= user.email %></p>
+                </div>
+                <div>
+                    <p class="text-sm text-zinc-500">Contact</p>
+                    <p><%= user.contact || 'Not provided' %></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cart Summary -->
+        <div class="mb-10 border-t pt-6">
+            <h3 class="text-lg font-semibold mb-4">Cart (<%= user.cart.length %> item<%= user.cart.length !== 1 ? 's' : '' %>)</h3>
+            <% if(user.cart.length === 0){ %>
+                <p class="text-zinc-500">Your cart is empty.</p>
+            <% } else { %>
+                <div class="flex flex-col gap-3">
+                    <% user.cart.forEach(function(item){ %>
+                        <div class="flex items-center justify-between border p-3 rounded">
+                            <div class="flex items-center gap-3">
+                                <div class="w-12 h-12 bg-zinc-100 rounded overflow-hidden">
+                                    <img class="w-full h-full object-cover" src="<%= item.image %>" alt="<%= item.name %>">
+                                </div>
+                                <span><%= item.name %></span>
+                            </div>
+                            <span>₹ <%= item.price %></span>
+                        </div>
+                    <% }) %>
+                </div>
+            <% } %>
+        </div>
+
+        <!-- Order History -->
+        <div class="border-t pt-6">
+            <h3 class="text-lg font-semibold mb-4">Order History</h3>
+            <% if(user.orders.length === 0){ %>
+                <p class="text-zinc-500">You have no past orders yet.</p>
+            <% } else { %>
+                <ul class="list-disc pl-5 text-zinc-700">
+                    <% user.orders.forEach(function(order){ %>
+                        <li><%= JSON.stringify(order) %></li>
+                    <% }) %>
+                </ul>
+            <% } %>
+        </div>
+
+    </div>
+</div>
+
+<%- include('./partials/footer') %>

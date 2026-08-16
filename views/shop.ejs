@@ -1,0 +1,53 @@
+<%- include('./partials/header') %>
+
+<% if(success.length > 0){ %>
+<div class="absolute top-5 left-1/2 -translate-x-1/2 p-3 rounded-md bg-blue-500">
+    <span class="text-white"><%= success %></span>
+</div>
+<% } %>
+
+<div class="w-full h-screen flex items-start px-20 py-20">
+    <div class="w-[25%] flex h-screen flex-col items-start">
+        <div class="flex items-center gap-2">
+            <h3>Sort by</h3>
+            <form action="/shop">
+                <select class="border px-2 py-1" name="sortby">
+                    <option value="popular">Popular</option>
+                    <option value="newest">Newest</option>
+                </select>
+            </form>
+        </div>
+    </div>
+
+    <div class="w-[75%] flex flex-wrap gap-5">
+
+        <% products.forEach(product => { %>
+
+        <div class="w-60 border rounded overflow-hidden">
+
+            <div class="w-full h-52 bg-gray-100">
+                <img
+                    class="w-full h-full object-cover"
+                    src="<%= product.image %>"
+                    alt="<%= product.name %>">
+            </div>
+
+            <div class="p-4">
+                <h3><%= product.name %></h3>
+                <h4>₹<%= product.price %></h4>
+
+                <a
+                    class="inline-block mt-3 px-4 py-2 bg-black text-white rounded"
+                    href="/addtocart/<%= product._id %>">
+                    Add to Cart
+                </a>
+            </div>
+
+        </div>
+
+        <% }) %>
+
+    </div>
+</div>
+
+<%- include('./partials/footer') %>
