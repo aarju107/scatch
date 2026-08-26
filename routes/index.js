@@ -30,7 +30,7 @@ router.get("/shop", isLoggedIn, async (req, res) => {
             products,
             success,
         });
-    } catch (err) {
+    } catch (err) { //error ke liye use hota hai 
         console.log("SHOP ERROR:", err);
         res.status(500).send(err.message);
     }
@@ -40,7 +40,7 @@ router.get("/shop", isLoggedIn, async (req, res) => {
 router.get("/cart", isLoggedIn, async (req, res) => {
     try {
         let user = await userModel
-            .findOne({ email: req.user.email })
+            .findOne({ email: req.user.email }) /////////////////////////////////
             .populate("cart");
 
         let bill = 0;
@@ -63,14 +63,14 @@ router.get("/cart", isLoggedIn, async (req, res) => {
 });
 
 // Add to Cart
-router.get("/addtocart/:productid", isLoggedIn, async (req, res) => {
+router.get("/addtocart/:productid", isLoggedIn, async (req, res) => { //non static route hai isliye get use kiya hai, aur productid ko params me bheja hai
     try {
         let user = await userModel.findOne({
             email: req.user.email,
         });
 
         user.cart.push(req.params.productid);
-        await user.save();
+        await user.save(); //push hi kra hai main to save bhi karna padega, warna database me update nahi hoga
 
         req.flash("success", "Added to cart");
         res.redirect("/shop");
@@ -86,6 +86,7 @@ router.get("/logout", isLoggedIn, (req, res) => {
     req.flash("success", "Logged out successfully");
     res.redirect("/");
 });
+//account page 
 router.get("/account", isLoggedIn, async (req, res) => {
     try {
         let user = await userModel

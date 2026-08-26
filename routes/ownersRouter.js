@@ -6,7 +6,7 @@ const ownerModel = require("../models/owners-model");
 const isOwnerLoggedIn = require("../middlewares/isOwnerLoggedIn");
 
 if (process.env.NODE_ENV === "development") {
-    router.post("/create", async (req, res) => {
+    router.post("/create", async (req, res) => { //body se req.body me data aayega, aur create karne ke liye post use kiya hai
         try {
             let owners = await ownerModel.find();
 
@@ -42,7 +42,7 @@ router.post("/login", async (req, res) => {
     try {
         let { email, password } = req.body;
 
-        let owner = await ownerModel.findOne({ email });
+        let owner = await ownerModel.findOne({ email }); //js apne aap se true false return karega, agar email match hua to owner object milega, nahi to null milega
         if (!owner) {
             req.flash("error", "Email or Password is incorrect");
             return res.redirect("/owners/login");

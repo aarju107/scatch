@@ -11,7 +11,7 @@ module.exports.registerUser = async (req, res) => {
         let user = await userModel.findOne({email: email});
         if (user) return res.status(401).send("User already exists, Please Login");
 
-        bcrypt.genSalt(10,(err, salt) => {
+        bcrypt.genSalt(10,(err, salt) => { //hash karne ke liye salt generate karna padega, aur salt ka size 10 hai, aur ye async hai isliye callback function use kiya hai 
             bcrypt.hash(password, salt, async (err, hash) => {
                 if (err) return res.send(err.message)
             else {
