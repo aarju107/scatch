@@ -10,7 +10,9 @@ module.exports = async (req, res, next) => {
 
         const decoded = jwt.verify(req.cookies.ownerToken, process.env.JWT_KEY);
 
-        const owner = await ownerModel.findOne({ email: decoded.email }).select("-password");
+        const owner = await ownerModel
+            .findOne({ email: decoded.email })
+            .select("-password");
 
         if (!owner) {
             req.flash("error", "Owner not found");
@@ -20,7 +22,7 @@ module.exports = async (req, res, next) => {
         req.owner = owner;
         next();
     } catch (err) {
-        console.log("Owner Middleware Error:", err);
+        console.error("isOwnerLoggedIn error:", err.message);
         req.flash("error", "You need to login first");
         return res.redirect("/owners/login");
     }

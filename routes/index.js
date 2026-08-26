@@ -1,103 +1,133 @@
 const express = require("express");
 const router = express.Router();
+const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
 
 const isLoggedIn = require("../middlewares/isLoggedIn");
 const productModel = require("../models/product-model");
 const userModel = require("../models/user-model");
+const { cookieOptions } = require("../utils/generateToken");
 
-// Home Page
+const PLATFORM_FEE = 20;
+
+// Home / auth page — send already-logged-in users straight to the shop
 router.get("/", (req, res) => {
-    let error = req.flash("error");
+    if (req.cookies.token) {
+        try {
+            jwt.verify(req.cookies.token, process.env.JWT_KEY);
+            return res.redirect("/shop");
+        } catch (err) {
+            res.clearCookie("token", { ...cookieOptions, maxAge: undefined });
+        }
+    }
+
     res.render("index", {
-        error,
+        error: req.flash("error"),
         loggedin: false,
     });
 });
 
-// Shop Page
-router.get("/shop", isLoggedIn, async (req, res) => {
-    console.log("===== SHOP ROUTE HIT =====");
-
+// Shop
+router.get("/shop", isLoggedIn, async (req, res, next) => {
     try {
-        let products = await productModel.find();
+        const sortby = req.query.sortby === "newest" ? { createdAt: -1 } : { price: 1 };
 
-        console.log("Products:", products);
-        console.log("Total Products:", products.length);
-
-        let success = req.flash("success");
+        const products = await productModel.find().sort(sortby);
 
         res.render("shop", {
             products,
-            success,
+            sortby: req.query.sortby || "popular",
+            success: req.flash("success"),
+            loggedin: true,
         });
-    } catch (err) { //error ke liye use hota hai 
-        console.log("SHOP ERROR:", err);
-        res.status(500).send(err.message);
+    } catch (err) {
+        next(err);
     }
 });
 
-// Cart Page
-router.get("/cart", isLoggedIn, async (req, res) => {
+// Cart
+router.get("/cart", isLoggedIn, async (req, res, next) => {
     try {
-        let user = await userModel
-            .findOne({ email: req.user.email }) /////////////////////////////////
+        const user = await userModel
+            .findOne({ email: req.user.email })
             .populate("cart");
 
-        let bill = 0;
+        const items = (user && user.cart) || [];
 
-        if (user.cart.length > 0) {
-            bill =
-                Number(user.cart[0].price) +
-                20 -
-                Number(user.cart[0].discount);
-        }
+        const totalMrp = items.reduce((sum, item) => sum + Number(item.price || 0), 0);
+        const totalDiscount = items.reduce(
+            (sum, item) => sum + Number(item.discount || 0),
+            0
+        );
+        const platformFee = items.length > 0 ? PLATFORM_FEE : 0;
+        const bill = totalMrp - totalDiscount + platformFee;
 
         res.render("cart", {
             user,
+            items,
+            totalMrp,
+            totalDiscount,
+            platformFee,
             bill,
+            success: req.flash("success"),
+            loggedin: true,
         });
     } catch (err) {
-        console.log(err);
-        res.status(500).send(err.message);
+        next(err);
     }
 });
 
-// Add to Cart
-router.get("/addtocart/:productid", isLoggedIn, async (req, res) => { //non static route hai isliye get use kiya hai, aur productid ko params me bheja hai
+// Add to cart
+router.get("/addtocart/:productid", isLoggedIn, async (req, res, next) => {
     try {
-        let user = await userModel.findOne({
-            email: req.user.email,
-        });
+        const { productid } = req.params;
 
-        user.cart.push(req.params.productid);
-        await user.save(); //push hi kra hai main to save bhi karna padega, warna database me update nahi hoga
+        if (!mongoose.Types.ObjectId.isValid(productid)) {
+            req.flash("error", "Invalid product");
+            return res.redirect("/shop");
+        }
+
+        const product = await productModel.findById(productid);
+        if (!product) {
+            req.flash("error", "Product not found");
+            return res.redirect("/shop");
+        }
+
+        await userModel.updateOne(
+            { _id: req.user._id },
+            { $addToSet: { cart: product._id } }
+        );
 
         req.flash("success", "Added to cart");
         res.redirect("/shop");
     } catch (err) {
-        console.log(err);
-        res.status(500).send(err.message);
+        next(err);
+    }
+});
+
+// Remove from cart
+router.get("/removefromcart/:productid", isLoggedIn, async (req, res, next) => {
+    try {
+        const { productid } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(productid)) {
+            req.flash("error", "Invalid product");
+            return res.redirect("/cart");
+        }
+
+        await userModel.updateOne({ _id: req.user._id }, { $pull: { cart: productid } });
+
+        req.flash("success", "Removed from cart");
+        res.redirect("/cart");
+    } catch (err) {
+        next(err);
     }
 });
 
 // Logout
-router.get("/logout", isLoggedIn, (req, res) => {
-    res.cookie("token", "");
-    req.flash("success", "Logged out successfully");
+router.get("/logout", (req, res) => {
+    res.clearCookie("token", { ...cookieOptions, maxAge: undefined });
     res.redirect("/");
-});
-//account page 
-router.get("/account", isLoggedIn, async (req, res) => {
-    try {
-        let user = await userModel
-            .findOne({ email: req.user.email })
-            .populate("cart");
-
-        res.render("account", { user });
-    } catch (err) {
-        console.log(err);
-        res.status(500).send(err.message);
-    }
 });
 
 module.exports = router;

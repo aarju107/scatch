@@ -1,76 +1,99 @@
 const express = require("express");
 const router = express.Router();
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+
 const ownerModel = require("../models/owners-model");
+const productModel = require("../models/product-model");
 const isOwnerLoggedIn = require("../middlewares/isOwnerLoggedIn");
+const { generateToken, cookieOptions } = require("../utils/generateToken");
 
+// Bootstrap route — only available locally, and only while no owner exists
 if (process.env.NODE_ENV === "development") {
-    router.post("/create", async (req, res) => { //body se req.body me data aayega, aur create karne ke liye post use kiya hai
+    router.post("/create", async (req, res, next) => {
         try {
-            let owners = await ownerModel.find();
-
+            const owners = await ownerModel.find();
             if (owners.length > 0) {
-                return res.status(500).send("You don't have permission to create owner");
+                return res
+                    .status(403)
+                    .send("An owner already exists — you can't create another");
             }
 
-            let { fullname, email, password } = req.body;
+            const fullname = (req.body.fullname || "").trim();
+            const email = (req.body.email || "").trim().toLowerCase();
+            const password = req.body.password || "";
 
-            let hash = await bcrypt.hash(password, 10);
+            if (!fullname || !email || !password) {
+                return res.status(400).send("fullname, email and password are required");
+            }
 
-            let createdOwner = await ownerModel.create({
+            const hash = await bcrypt.hash(password, 10);
+            const createdOwner = await ownerModel.create({
                 fullname,
                 email,
                 password: hash,
             });
 
-            res.status(201).send(createdOwner);
+            res.status(201).json({
+                _id: createdOwner._id,
+                fullname: createdOwner.fullname,
+                email: createdOwner.email,
+            });
         } catch (err) {
-            res.status(500).send(err.message);
+            next(err);
         }
     });
 }
 
-// Owner Login Page
 router.get("/login", (req, res) => {
-    let error = req.flash("error");
-    res.render("owner-login", { error, loggedin: false });
+    res.render("owner-login", { error: req.flash("error"), loggedin: false });
 });
 
-// Owner Login
-router.post("/login", async (req, res) => {
+router.post("/login", async (req, res, next) => {
     try {
-        let { email, password } = req.body;
+        const email = (req.body.email || "").trim().toLowerCase();
+        const password = req.body.password || "";
 
-        let owner = await ownerModel.findOne({ email }); //js apne aap se true false return karega, agar email match hua to owner object milega, nahi to null milega
+        const owner = await ownerModel.findOne({ email });
         if (!owner) {
             req.flash("error", "Email or Password is incorrect");
             return res.redirect("/owners/login");
         }
 
-        let result = await bcrypt.compare(password, owner.password);
-        if (!result) {
+        const match = await bcrypt.compare(password, owner.password);
+        if (!match) {
             req.flash("error", "Email or Password is incorrect");
             return res.redirect("/owners/login");
         }
 
-        let token = jwt.sign({ email: owner.email, id: owner._id }, process.env.JWT_KEY);
-        res.cookie("ownerToken", token);
+        res.cookie("ownerToken", generateToken(owner), cookieOptions);
         res.redirect("/owners/admin");
     } catch (err) {
-        res.status(500).send(err.message);
+        next(err);
     }
 });
 
-// Owner Logout
 router.get("/logout", (req, res) => {
-    res.cookie("ownerToken", "");
+    res.clearCookie("ownerToken", { ...cookieOptions, maxAge: undefined });
     res.redirect("/owners/login");
 });
 
+// Create-product form
 router.get("/admin", isOwnerLoggedIn, (req, res) => {
-    let success = req.flash("success");
-    res.render("createproducts", { success });
+    res.render("createproducts", {
+        success: req.flash("success"),
+        error: req.flash("error"),
+        loggedin: false,
+    });
+});
+
+// All products, for the owner
+router.get("/products", isOwnerLoggedIn, async (req, res, next) => {
+    try {
+        const products = await productModel.find().sort({ createdAt: -1 });
+        res.render("admin", { products, loggedin: false });
+    } catch (err) {
+        next(err);
+    }
 });
 
 module.exports = router;

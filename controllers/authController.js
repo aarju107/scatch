@@ -1,63 +1,74 @@
+const bcrypt = require("bcryptjs");
 const userModel = require("../models/user-model");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const {generateToken} = require("../utils/generateToken");
+const { generateToken, cookieOptions } = require("../utils/generateToken");
 
-
-module.exports.registerUser = async (req, res) => {
+module.exports.registerUser = async function (req, res) {
     try {
-        let {fullname, email, password} = req.body;
+        const fullname = (req.body.fullname || "").trim();
+        const email = (req.body.email || "").trim().toLowerCase();
+        const password = req.body.password || "";
 
-        let user = await userModel.findOne({email: email});
-        if (user) return res.status(401).send("User already exists, Please Login");
+        if (!fullname || !email || !password) {
+            req.flash("error", "All fields are required");
+            return res.redirect("/");
+        }
 
-        bcrypt.genSalt(10,(err, salt) => { //hash karne ke liye salt generate karna padega, aur salt ka size 10 hai, aur ye async hai isliye callback function use kiya hai 
-            bcrypt.hash(password, salt, async (err, hash) => {
-                if (err) return res.send(err.message)
-            else {
-                let user = await userModel.create({
-                    fullname,
-                    email,
-                    password: hash
-                });
+        if (fullname.length < 3) {
+            req.flash("error", "Full name must be at least 3 characters");
+            return res.redirect("/");
+        }
 
-                let token = generateToken(user);
-                res.cookie("token", token);
-                res.redirect("/shop");
-            };
-            })
-        })
-    } catch (error) {
-        // res.status(500).send(error)
+        if (password.length < 6) {
+            req.flash("error", "Password must be at least 6 characters");
+            return res.redirect("/");
+        }
 
+        const existing = await userModel.findOne({ email });
+        if (existing) {
+            req.flash("error", "User already exists, please login");
+            return res.redirect("/");
+        }
+
+        const hash = await bcrypt.hash(password, 10);
+
+        const user = await userModel.create({ fullname, email, password: hash });
+
+        res.cookie("token", generateToken(user), cookieOptions);
+        return res.redirect("/shop");
+    } catch (err) {
+        console.error("registerUser error:", err);
+        req.flash("error", "Something went wrong, please try again");
+        return res.redirect("/");
     }
-
-}
+};
 
 module.exports.loginUser = async function (req, res) {
-    let {email, password} = req.body;
+    try {
+        const email = (req.body.email || "").trim().toLowerCase();
+        const password = req.body.password || "";
 
-    let user = await userModel.findOne({email: email})
-    if(!user){
-        req.flash("error", "Email or Password is incorrect");
-        return res.redirect("/");
-    };
-
-    bcrypt.compare(password, user.password, (err, result) => {
-        if(result){
-            let token = generateToken(user);
-            console.log(token);
-            res.cookie("token", token);
-            res.redirect("/shop");
-        }
-        else{
+        const user = await userModel.findOne({ email });
+        if (!user) {
             req.flash("error", "Email or Password is incorrect");
             return res.redirect("/");
         }
-    })
+
+        const match = await bcrypt.compare(password, user.password);
+        if (!match) {
+            req.flash("error", "Email or Password is incorrect");
+            return res.redirect("/");
+        }
+
+        res.cookie("token", generateToken(user), cookieOptions);
+        return res.redirect("/shop");
+    } catch (err) {
+        console.error("loginUser error:", err);
+        req.flash("error", "Something went wrong, please try again");
+        return res.redirect("/");
+    }
 };
 
 module.exports.logoutUser = function (req, res) {
-    res.cookie("token", "");
-    res.redirect("/");
-}
+    res.clearCookie("token", { ...cookieOptions, maxAge: undefined });
+    return res.redirect("/");
+};
